@@ -1309,29 +1309,38 @@ function beginTrace() {
 
 function traceIP(ip) {
   const endpoint = ip
-    ? `https://ip-api.com/json/${encodeURIComponent(ip)}?fields=status,message,country,countryCode,regionName,city,zip,lat,lon,timezone,isp,org,as,mobile,proxy,hosting,query`
-    : `https://ip-api.com/json/?fields=status,message,country,countryCode,regionName,city,zip,lat,lon,timezone,isp,org,as,mobile,proxy,hosting,query`;
+    ? `https://ipwho.is/${encodeURIComponent(ip)}`
+    : `https://ipwho.is/`;
 
   fetch(endpoint)
     .then(r => r.json())
     .then(data => {
-      if (data.status === 'fail') {
+      if (!data.success) {
         goToEntry();
         showError(data.message || 'Lookup failed. Check the IP address.');
         return;
       }
-      const connType = data.hosting ? 'Hosting/Datacenter' : data.proxy ? 'Proxy/VPN' : data.mobile ? 'Mobile Network' : 'Residential/Business';
+      // 10.x / 192.168.x / 172.16.x are private — catch early
+      if (!data.lat && !data.lon) {
+        goToEntry();
+        showError('Private/reserved IP range. Enter a public IP address.');
+        return;
+      }
+      const connType = data.type === 'IPv6' ? 'IPv6 Address' :
+                       (data.connection && data.connection.isp) ? 'Residential/Business' : 'Unknown';
+      const isp = (data.connection && data.connection.isp) || data.org || '—';
+      const org = (data.connection && data.connection.org) || (data.connection && data.connection.asn ? `AS${data.connection.asn}` : '—');
       renderResult({
-        target: data.query,
-        city: `${data.city}, ${data.regionName}`,
-        country: `${data.country} (${data.countryCode})`,
-        coords: `${data.lat.toFixed(5)}, ${data.lon.toFixed(5)}`,
-        timezone: data.timezone,
-        isp: data.isp || '—',
-        org: data.org || '—',
+        target: data.ip,
+        city: `${data.city || '—'}, ${data.region || '—'}`,
+        country: `${data.country || '—'} (${data.country_code || '—'})`,
+        coords: `${parseFloat(data.latitude).toFixed(5)}, ${parseFloat(data.longitude).toFixed(5)}`,
+        timezone: data.timezone && data.timezone.id ? data.timezone.id : '—',
+        isp: isp,
+        org: org,
         conntype: connType,
-        lat: data.lat,
-        lng: data.lon,
+        lat: parseFloat(data.latitude),
+        lng: parseFloat(data.longitude),
       });
     })
     .catch(() => {
