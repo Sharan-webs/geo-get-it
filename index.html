@@ -1006,6 +1006,19 @@
         </div>
       </div>
 
+      <div class="data-row" style="border-left:2px solid var(--c-accent2)">
+        <div class="data-row-icon" style="background:rgba(0,255,136,0.08);border-color:rgba(0,255,136,0.2)">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#00ff88" stroke-width="1.5">
+            <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/>
+            <circle cx="12" cy="9" r="2.5"/>
+          </svg>
+        </div>
+        <div class="data-row-content">
+          <div class="data-row-label" style="color:var(--c-accent2)">EXACT LOCATION</div>
+          <div class="data-row-value" id="result-exact" style="color:var(--c-accent2);font-size:12px">Resolving via reverse geocode...</div>
+        </div>
+      </div>
+
       <div class="data-row">
         <div class="data-row-icon">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
@@ -1090,7 +1103,7 @@
     </div>
   </div>
 
-  <div class="result-map-wrap">
+  <div class="result-map-wrap" id="map-wrap">
     <div id="result-map"></div>
     <div class="map-crosshair" id="map-crosshair">
       <div class="crosshair-ring"></div>
@@ -1101,6 +1114,42 @@
       <div class="hud-chip" id="hud-zoom">ZOOM: --</div>
       <div class="hud-chip" id="hud-status">STATUS: LOCKED</div>
     </div>
+
+    <!-- FULLSCREEN BUTTON -->
+    <button id="btn-fullscreen" onclick="toggleFullscreen()" style="
+      position:absolute;top:16px;left:16px;z-index:500;
+      background:rgba(6,13,20,0.92);
+      border:1px solid #0f2a3f;
+      color:#00d4ff;
+      font-family:'Share Tech Mono',monospace;
+      font-size:11px;letter-spacing:0.15em;
+      padding:10px 14px;
+      cursor:pointer;
+      backdrop-filter:blur(8px);
+      display:flex;align-items:center;gap:8px;
+      transition:all 0.2s ease;
+    " onmouseover="this.style.borderColor='#00d4ff'" onmouseout="this.style.borderColor='#0f2a3f'">
+      <svg id="fs-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+        <path d="M8 3H5a2 2 0 00-2 2v3M21 8V5a2 2 0 00-2-2h-3M3 16v3a2 2 0 002 2h3M16 21h3a2 2 0 002-2v-3"/>
+      </svg>
+      FULLSCREEN
+    </button>
+
+    <!-- ACCURACY NOTE bottom-left -->
+    <div id="accuracy-note" style="
+      position:absolute;bottom:48px;left:12px;z-index:500;
+      background:rgba(6,13,20,0.88);
+      border:1px solid #0f2a3f;
+      border-left:2px solid #ff3366;
+      padding:8px 12px;
+      font-family:'Share Tech Mono',monospace;
+      font-size:9px;letter-spacing:0.1em;
+      color:#ff3366;
+      max-width:220px;line-height:1.5;
+      backdrop-filter:blur(8px);
+      display:none;
+    "></div>
+
     <div class="result-action-bar">
       <button class="action-btn primary" onclick="copyCoords()">COPY COORDS</button>
       <button class="action-btn" onclick="openStreetView()">OPEN IN MAPS</button>
@@ -1449,6 +1498,54 @@ function getCarrierHint(code, local) {
   return 'Mobile Network Carrier';
 }
 
+// ── REVERSE GEOCODE via Nominatim ────────────────────────
+function reverseGeocode(lat, lng, isPhone) {
+  const el = document.getElementById('result-exact');
+  const note = document.getElementById('accuracy-note');
+  el.textContent = 'Resolving via reverse geocode...';
+
+  fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}&zoom=14&addressdetails=1`, {
+    headers: { 'Accept-Language': 'en', 'User-Agent': 'NexusTrace/4.1' }
+  })
+  .then(r => r.json())
+  .then(d => {
+    const a = d.address || {};
+    const parts = [
+      a.suburb || a.neighbourhood || a.hamlet || a.village,
+      a.city || a.town || a.municipality || a.county,
+      a.state_district || a.state,
+      a.country
+    ].filter(Boolean);
+    const locationStr = parts.join(', ') || d.display_name || 'Location resolved';
+    el.textContent = locationStr;
+
+    // Update popup if marker exists
+    if (resultMap) {
+      resultMap.eachLayer(layer => {
+        if (layer instanceof L.Marker) {
+          layer.setPopupContent(`
+            <div style="font-family:'Share Tech Mono',monospace;font-size:11px;color:#00d4ff;background:#060d14;border:1px solid #0f2a3f;padding:10px;min-width:200px">
+              <div style="color:#a8c8e8;margin-bottom:6px;font-size:9px;letter-spacing:0.2em">TARGET LOCATION</div>
+              <div style="font-size:12px;margin-bottom:6px;color:#00ff88;line-height:1.4">${locationStr}</div>
+              <div style="color:#2a4a6a;font-size:10px">${lat.toFixed(5)}, ${lng.toFixed(5)}</div>
+            </div>
+          `);
+        }
+      });
+    }
+
+    if (isPhone) {
+      note.style.display = 'block';
+      note.textContent = '// PHONE: Location shows telecom circle center. Exact GPS unavailable without carrier access.';
+    } else {
+      note.style.display = 'none';
+    }
+  })
+  .catch(() => {
+    el.textContent = `${lat.toFixed(5)}, ${lng.toFixed(5)} (reverse geocode failed)`;
+  });
+}
+
 // ── RENDER RESULT ────────────────────────────────────────
 function renderResult(data) {
   currentLat = data.lat;
@@ -1456,6 +1553,7 @@ function renderResult(data) {
 
   document.getElementById('result-target').textContent = data.target;
   document.getElementById('result-city').textContent = data.city;
+  document.getElementById('result-exact').textContent = 'Resolving...';
   document.getElementById('result-country').textContent = data.country;
   document.getElementById('result-coords').textContent = data.coords;
   document.getElementById('result-timezone').textContent = data.timezone;
@@ -1463,13 +1561,18 @@ function renderResult(data) {
   document.getElementById('result-org').textContent = data.org;
   document.getElementById('result-conntype').textContent = data.conntype;
   document.getElementById('hud-coords').textContent = `LAT/LNG: ${data.lat.toFixed(4)}, ${data.lng.toFixed(4)}`;
+  document.getElementById('accuracy-note').style.display = 'none';
 
   showScreen('screen-result');
 
-  // Animate confidence bar
   setTimeout(() => {
-    document.getElementById('conf-bar').style.width = currentTab === 'ip' ? '88%' : '62%';
+    document.getElementById('conf-bar').style.width = currentTab === 'ip' ? '88%' : '52%';
   }, 600);
+
+  // Reverse geocode for exact location name
+  setTimeout(() => {
+    reverseGeocode(data.lat, data.lng, currentTab === 'phone');
+  }, 800);
 
   // Init or update map
   setTimeout(() => {
@@ -1479,7 +1582,6 @@ function renderResult(data) {
         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
         maxZoom: 19
       }).addTo(resultMap);
-
       resultMap.on('zoom', () => {
         document.getElementById('hud-zoom').textContent = `ZOOM: ${resultMap.getZoom()}`;
       });
@@ -1487,52 +1589,31 @@ function renderResult(data) {
 
     resultMap.invalidateSize();
 
-    // Custom marker
     const markerHtml = `
       <div style="
-        width:16px;height:16px;
-        border-radius:50%;
-        background:rgba(0,212,255,0.9);
-        border:2px solid #fff;
-        box-shadow:0 0 0 4px rgba(0,212,255,0.3), 0 0 20px rgba(0,212,255,0.6);
-        position:relative;
-      ">
-        <div style="
-          position:absolute;top:50%;left:50%;
-          transform:translate(-50%,-50%);
-          width:32px;height:32px;
-          border-radius:50%;
-          border:1px solid rgba(0,212,255,0.4);
-          animation:none;
-        "></div>
-      </div>`;
+        width:16px;height:16px;border-radius:50%;
+        background:rgba(0,212,255,0.9);border:2px solid #fff;
+        box-shadow:0 0 0 4px rgba(0,212,255,0.3),0 0 20px rgba(0,212,255,0.6);
+      "></div>`;
 
-    const icon = L.divIcon({
-      html: markerHtml,
-      iconSize: [16, 16],
-      iconAnchor: [8, 8],
-      className: ''
-    });
+    const icon = L.divIcon({ html: markerHtml, iconSize:[16,16], iconAnchor:[8,8], className:'' });
 
-    resultMap.eachLayer(layer => {
-      if (layer instanceof L.Marker) resultMap.removeLayer(layer);
-    });
+    resultMap.eachLayer(layer => { if (layer instanceof L.Marker) resultMap.removeLayer(layer); });
 
-    const marker = L.marker([data.lat, data.lng], { icon })
+    L.marker([data.lat, data.lng], { icon })
       .addTo(resultMap)
       .bindPopup(`
-        <div style="font-family:'Share Tech Mono',monospace;font-size:11px;color:#00d4ff;background:#060d14;border:1px solid #0f2a3f;padding:8px;min-width:180px">
+        <div style="font-family:'Share Tech Mono',monospace;font-size:11px;color:#00d4ff;background:#060d14;border:1px solid #0f2a3f;padding:10px;min-width:200px">
           <div style="color:#a8c8e8;margin-bottom:4px;font-size:9px;letter-spacing:0.2em">TARGET LOCATION</div>
           <div style="font-size:13px;margin-bottom:4px">${data.city}</div>
           <div style="color:#00ff88">${data.coords}</div>
         </div>
-      `, {
-        className: 'custom-popup'
-      })
+      `)
       .openPopup();
 
-    resultMap.setView([data.lat, data.lng], 11);
-    document.getElementById('hud-zoom').textContent = `ZOOM: 11`;
+    const zoomLevel = currentTab === 'ip' ? 13 : 8;
+    resultMap.setView([data.lat, data.lng], zoomLevel);
+    document.getElementById('hud-zoom').textContent = `ZOOM: ${zoomLevel}`;
     document.getElementById('hud-status').textContent = 'STATUS: LOCKED';
 
     setTimeout(() => {
@@ -1540,6 +1621,45 @@ function renderResult(data) {
     }, 800);
 
   }, 300);
+}
+
+// ── FULLSCREEN ───────────────────────────────────────────
+let isFullscreen = false;
+function toggleFullscreen() {
+  const wrap = document.getElementById('map-wrap');
+  const sidebar = document.querySelector('.result-sidebar');
+  const btn = document.getElementById('btn-fullscreen');
+  const icon = document.getElementById('fs-icon');
+
+  isFullscreen = !isFullscreen;
+
+  if (isFullscreen) {
+    sidebar.style.display = 'none';
+    wrap.style.position = 'fixed';
+    wrap.style.inset = '0';
+    wrap.style.zIndex = '200';
+    wrap.style.width = '100vw';
+    wrap.style.height = '100vh';
+    btn.innerHTML = `
+      <svg id="fs-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+        <path d="M8 3v3a2 2 0 01-2 2H3M21 8h-3a2 2 0 01-2-2V3M3 16h3a2 2 0 012 2v3M16 21v-3a2 2 0 012-2h3"/>
+      </svg>
+      EXIT FULLSCREEN`;
+  } else {
+    sidebar.style.display = '';
+    wrap.style.position = '';
+    wrap.style.inset = '';
+    wrap.style.zIndex = '';
+    wrap.style.width = '';
+    wrap.style.height = '';
+    btn.innerHTML = `
+      <svg id="fs-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+        <path d="M8 3H5a2 2 0 00-2 2v3M21 8V5a2 2 0 00-2-2h-3M3 16v3a2 2 0 002 2h3M16 21h3a2 2 0 002-2v-3"/>
+      </svg>
+      FULLSCREEN`;
+  }
+
+  setTimeout(() => { if (resultMap) resultMap.invalidateSize(); }, 100);
 }
 
 // ── ACTIONS ──────────────────────────────────────────────
@@ -1565,6 +1685,7 @@ document.addEventListener('keydown', e => {
     if (active && active.id === 'screen-entry') beginTrace();
   }
   if (e.key === 'Escape') {
+    if (isFullscreen) { toggleFullscreen(); return; }
     const active = document.querySelector('.screen:not(.hidden)');
     if (active && (active.id === 'screen-entry' || active.id === 'screen-result')) goHome();
   }
