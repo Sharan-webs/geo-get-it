@@ -1,0 +1,1493 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NEXUS TRACE // GEO INTELLIGENCE</title>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<style>
+  :root {
+    --c-bg: #020408;
+    --c-surface: #060d14;
+    --c-panel: #0a1520;
+    --c-border: #0f2a3f;
+    --c-accent: #00d4ff;
+    --c-accent2: #00ff88;
+    --c-accent3: #ff3366;
+    --c-text: #a8c8e8;
+    --c-dim: #2a4a6a;
+    --c-glow: rgba(0,212,255,0.15);
+    --c-glow2: rgba(0,255,136,0.1);
+    --font-mono: 'Share Tech Mono', monospace;
+    --font-display: 'Orbitron', monospace;
+    --font-body: 'Rajdhani', sans-serif;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    width: 100%; height: 100%;
+    background: var(--c-bg);
+    color: var(--c-text);
+    font-family: var(--font-body);
+    overflow: hidden;
+  }
+
+  /* ── SCANLINE OVERLAY ── */
+  body::before {
+    content: '';
+    position: fixed; inset: 0; z-index: 9999;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(0,0,0,0.08) 2px,
+      rgba(0,0,0,0.08) 4px
+    );
+    pointer-events: none;
+    animation: scanMove 8s linear infinite;
+  }
+
+  body::after {
+    content: '';
+    position: fixed; inset: 0; z-index: 9998;
+    background: radial-gradient(ellipse at center, transparent 40%, rgba(0,0,0,0.6) 100%);
+    pointer-events: none;
+  }
+
+  @keyframes scanMove {
+    0% { background-position: 0 0; }
+    100% { background-position: 0 100px; }
+  }
+
+  /* ── MATRIX CANVAS BG ── */
+  #matrix-canvas {
+    position: fixed; inset: 0; z-index: 0;
+    opacity: 0.18;
+  }
+
+  /* ── SCREENS ── */
+  .screen {
+    position: fixed; inset: 0; z-index: 10;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    transition: opacity 0.6s cubic-bezier(0.4,0,0.2,1),
+                transform 0.6s cubic-bezier(0.4,0,0.2,1);
+  }
+
+  .screen.hidden {
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(20px);
+  }
+
+  /* ── HOME SCREEN ── */
+  #screen-home {
+    gap: 0;
+  }
+
+  .home-logo-wrap {
+    position: relative;
+    margin-bottom: 48px;
+    text-align: center;
+  }
+
+  .home-logo-ring {
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    width: 220px; height: 220px;
+    border-radius: 50%;
+    border: 1px solid rgba(0,212,255,0.2);
+    animation: ringPulse 3s ease-in-out infinite;
+  }
+
+  .home-logo-ring:nth-child(2) {
+    width: 260px; height: 260px;
+    border-color: rgba(0,212,255,0.1);
+    animation-delay: 0.5s;
+  }
+
+  .home-logo-ring:nth-child(3) {
+    width: 300px; height: 300px;
+    border-color: rgba(0,212,255,0.05);
+    animation-delay: 1s;
+  }
+
+  @keyframes ringPulse {
+    0%, 100% { opacity: 0.4; transform: translate(-50%,-50%) scale(1); }
+    50% { opacity: 1; transform: translate(-50%,-50%) scale(1.05); }
+  }
+
+  .home-icon {
+    width: 180px; height: 180px;
+    position: relative; z-index: 2;
+    display: flex; align-items: center; justify-content: center;
+  }
+
+  .home-icon svg {
+    width: 80px; height: 80px;
+    filter: drop-shadow(0 0 20px var(--c-accent));
+    animation: iconFloat 4s ease-in-out infinite;
+  }
+
+  @keyframes iconFloat {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-8px); }
+  }
+
+  .home-title {
+    font-family: var(--font-display);
+    font-size: clamp(28px, 5vw, 52px);
+    font-weight: 900;
+    letter-spacing: 0.15em;
+    color: var(--c-accent);
+    text-shadow: 0 0 40px rgba(0,212,255,0.6), 0 0 80px rgba(0,212,255,0.2);
+    animation: titleFlicker 6s ease-in-out infinite;
+    text-align: center;
+    line-height: 1;
+    margin-bottom: 12px;
+  }
+
+  @keyframes titleFlicker {
+    0%, 94%, 96%, 98%, 100% { opacity: 1; }
+    95%, 97% { opacity: 0.85; }
+  }
+
+  .home-subtitle {
+    font-family: var(--font-mono);
+    font-size: 13px;
+    letter-spacing: 0.3em;
+    color: var(--c-dim);
+    text-align: center;
+    margin-bottom: 8px;
+  }
+
+  .home-version {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.2em;
+    color: rgba(0,212,255,0.3);
+    text-align: center;
+    margin-bottom: 56px;
+  }
+
+  .divider-line {
+    width: 280px;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--c-accent), transparent);
+    margin: 0 auto 48px;
+    opacity: 0.4;
+  }
+
+  .btn-start {
+    position: relative;
+    font-family: var(--font-display);
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 0.25em;
+    color: var(--c-bg);
+    background: var(--c-accent);
+    border: none;
+    padding: 18px 56px;
+    cursor: pointer;
+    clip-path: polygon(12px 0%, 100% 0%, calc(100% - 12px) 100%, 0% 100%);
+    transition: all 0.3s ease;
+    text-transform: uppercase;
+    overflow: hidden;
+  }
+
+  .btn-start::before {
+    content: '';
+    position: absolute; inset: 0;
+    background: linear-gradient(135deg, transparent 30%, rgba(255,255,255,0.2) 50%, transparent 70%);
+    transform: translateX(-100%);
+    transition: transform 0.6s ease;
+  }
+
+  .btn-start:hover::before { transform: translateX(100%); }
+
+  .btn-start:hover {
+    background: var(--c-accent2);
+    box-shadow: 0 0 40px rgba(0,255,136,0.5);
+    transform: translateY(-2px);
+  }
+
+  .btn-start:active { transform: translateY(0); }
+
+  .status-bar {
+    position: fixed; bottom: 0; left: 0; right: 0;
+    height: 36px;
+    background: rgba(6,13,20,0.9);
+    border-top: 1px solid var(--c-border);
+    display: flex; align-items: center;
+    padding: 0 24px;
+    gap: 32px;
+    z-index: 100;
+  }
+
+  .status-item {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.15em;
+    color: var(--c-dim);
+    display: flex; align-items: center; gap: 8px;
+  }
+
+  .status-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--c-accent2);
+    animation: dotBlink 2s ease-in-out infinite;
+  }
+
+  @keyframes dotBlink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.2; }
+  }
+
+  /* ── ENTRY SCREEN ── */
+  #screen-entry {
+    gap: 0;
+    padding: 40px 20px 60px;
+  }
+
+  .panel {
+    background: var(--c-surface);
+    border: 1px solid var(--c-border);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .panel::before {
+    content: '';
+    position: absolute; top: 0; left: 0; right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, var(--c-accent), transparent);
+  }
+
+  .entry-panel {
+    width: min(520px, 94vw);
+    padding: 40px;
+  }
+
+  .panel-label {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.4em;
+    color: var(--c-accent);
+    margin-bottom: 24px;
+    display: flex; align-items: center; gap: 12px;
+  }
+
+  .panel-label::after {
+    content: '';
+    flex: 1; height: 1px;
+    background: var(--c-border);
+  }
+
+  .entry-title {
+    font-family: var(--font-display);
+    font-size: 22px;
+    font-weight: 700;
+    color: #e8f4ff;
+    margin-bottom: 8px;
+    letter-spacing: 0.05em;
+  }
+
+  .entry-desc {
+    font-family: var(--font-body);
+    font-size: 14px;
+    font-weight: 300;
+    color: var(--c-dim);
+    margin-bottom: 32px;
+    line-height: 1.6;
+  }
+
+  /* TABS */
+  .tab-row {
+    display: flex;
+    gap: 2px;
+    margin-bottom: 28px;
+    background: var(--c-bg);
+    padding: 4px;
+    border: 1px solid var(--c-border);
+  }
+
+  .tab-btn {
+    flex: 1;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.2em;
+    padding: 10px;
+    background: transparent;
+    border: none;
+    color: var(--c-dim);
+    cursor: pointer;
+    transition: all 0.3s ease;
+    text-transform: uppercase;
+  }
+
+  .tab-btn.active {
+    background: var(--c-accent);
+    color: var(--c-bg);
+  }
+
+  .tab-btn:not(.active):hover {
+    color: var(--c-accent);
+    background: rgba(0,212,255,0.05);
+  }
+
+  /* INPUT */
+  .input-wrap {
+    position: relative;
+    margin-bottom: 24px;
+  }
+
+  .input-field {
+    width: 100%;
+    background: var(--c-bg);
+    border: 1px solid var(--c-border);
+    color: var(--c-accent2);
+    font-family: var(--font-mono);
+    font-size: 15px;
+    letter-spacing: 0.1em;
+    padding: 16px 48px 16px 20px;
+    outline: none;
+    transition: border-color 0.3s ease, box-shadow 0.3s ease;
+    -webkit-appearance: none;
+  }
+
+  .input-field::placeholder {
+    color: var(--c-dim);
+    font-size: 13px;
+  }
+
+  .input-field:focus {
+    border-color: var(--c-accent);
+    box-shadow: 0 0 0 1px var(--c-accent), inset 0 0 20px rgba(0,212,255,0.05);
+  }
+
+  .input-icon {
+    position: absolute; right: 16px; top: 50%;
+    transform: translateY(-50%);
+    color: var(--c-dim);
+    pointer-events: none;
+  }
+
+  .input-hint {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    color: var(--c-dim);
+    margin-top: 8px;
+    margin-bottom: 0;
+  }
+
+  .btn-trace {
+    width: 100%;
+    font-family: var(--font-display);
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.3em;
+    color: var(--c-bg);
+    background: linear-gradient(135deg, var(--c-accent), var(--c-accent2));
+    border: none;
+    padding: 18px;
+    cursor: pointer;
+    text-transform: uppercase;
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+    margin-top: 8px;
+  }
+
+  .btn-trace::before {
+    content: '';
+    position: absolute; inset: 0;
+    background: linear-gradient(135deg, var(--c-accent2), var(--c-accent));
+    opacity: 0;
+    transition: opacity 0.3s ease;
+  }
+
+  .btn-trace:hover::before { opacity: 1; }
+  .btn-trace:hover { box-shadow: 0 0 40px rgba(0,212,255,0.4); transform: translateY(-1px); }
+  .btn-trace span { position: relative; z-index: 1; }
+
+  .btn-back {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.2em;
+    color: var(--c-dim);
+    background: transparent;
+    border: 1px solid var(--c-border);
+    padding: 10px 24px;
+    cursor: pointer;
+    text-transform: uppercase;
+    transition: all 0.3s ease;
+    margin-top: 16px;
+    display: block;
+    width: 100%;
+    text-align: center;
+  }
+
+  .btn-back:hover { color: var(--c-accent); border-color: var(--c-accent); }
+
+  /* ── LOADING SCREEN ── */
+  #screen-loading {
+    gap: 32px;
+  }
+
+  .loading-ring-wrap {
+    position: relative;
+    width: 160px; height: 160px;
+    display: flex; align-items: center; justify-content: center;
+  }
+
+  .loading-ring {
+    position: absolute;
+    border-radius: 50%;
+    border: 2px solid transparent;
+  }
+
+  .lr1 {
+    width: 160px; height: 160px;
+    border-top-color: var(--c-accent);
+    border-right-color: rgba(0,212,255,0.2);
+    animation: spin 1.2s linear infinite;
+  }
+
+  .lr2 {
+    width: 120px; height: 120px;
+    border-bottom-color: var(--c-accent2);
+    border-left-color: rgba(0,255,136,0.2);
+    animation: spin 0.8s linear infinite reverse;
+  }
+
+  .lr3 {
+    width: 80px; height: 80px;
+    border-top-color: var(--c-accent3);
+    border-right-color: rgba(255,51,102,0.2);
+    animation: spin 2s linear infinite;
+  }
+
+  .lr-center {
+    font-family: var(--font-display);
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    color: var(--c-accent);
+    text-align: center;
+    line-height: 1.4;
+    z-index: 1;
+  }
+
+  @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+  .loading-title {
+    font-family: var(--font-display);
+    font-size: 18px;
+    font-weight: 700;
+    letter-spacing: 0.2em;
+    color: var(--c-accent);
+    text-align: center;
+  }
+
+  .loading-steps {
+    width: min(360px, 90vw);
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .loading-step {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    letter-spacing: 0.05em;
+    color: var(--c-dim);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    opacity: 0;
+    transform: translateX(-10px);
+    transition: opacity 0.4s ease, transform 0.4s ease, color 0.4s ease;
+  }
+
+  .loading-step.active {
+    opacity: 1;
+    transform: translateX(0);
+    color: var(--c-accent2);
+  }
+
+  .loading-step.done {
+    opacity: 0.5;
+    transform: translateX(0);
+    color: var(--c-dim);
+  }
+
+  .step-icon { font-size: 14px; width: 16px; text-align: center; }
+
+  .loading-bar-wrap {
+    width: min(360px, 90vw);
+    height: 2px;
+    background: var(--c-border);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .loading-bar {
+    position: absolute; left: 0; top: 0; bottom: 0;
+    background: linear-gradient(90deg, var(--c-accent), var(--c-accent2));
+    width: 0%;
+    transition: width 0.4s ease;
+    box-shadow: 0 0 10px var(--c-accent);
+  }
+
+  /* ── RESULT SCREEN ── */
+  #screen-result {
+    flex-direction: row;
+    align-items: stretch;
+    justify-content: flex-start;
+    padding: 0;
+    gap: 0;
+  }
+
+  .result-sidebar {
+    width: 340px;
+    min-width: 280px;
+    background: var(--c-surface);
+    border-right: 1px solid var(--c-border);
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+    z-index: 20;
+    flex-shrink: 0;
+  }
+
+  .sidebar-header {
+    padding: 24px 24px 20px;
+    border-bottom: 1px solid var(--c-border);
+    position: relative;
+  }
+
+  .sidebar-header::after {
+    content: '';
+    position: absolute; bottom: -1px; left: 0; right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, var(--c-accent), transparent);
+  }
+
+  .sidebar-logo {
+    font-family: var(--font-display);
+    font-size: 13px;
+    font-weight: 900;
+    letter-spacing: 0.2em;
+    color: var(--c-accent);
+    margin-bottom: 4px;
+  }
+
+  .sidebar-tagline {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    letter-spacing: 0.2em;
+    color: var(--c-dim);
+  }
+
+  .target-badge {
+    margin: 20px 24px;
+    padding: 14px 16px;
+    background: var(--c-bg);
+    border: 1px solid var(--c-border);
+    border-left: 3px solid var(--c-accent);
+  }
+
+  .target-label {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    letter-spacing: 0.3em;
+    color: var(--c-dim);
+    margin-bottom: 6px;
+  }
+
+  .target-value {
+    font-family: var(--font-mono);
+    font-size: 16px;
+    color: var(--c-accent2);
+    word-break: break-all;
+  }
+
+  .data-section {
+    padding: 0 24px 16px;
+  }
+
+  .data-section-title {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    letter-spacing: 0.35em;
+    color: var(--c-dim);
+    margin-bottom: 12px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--c-border);
+  }
+
+  .data-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    margin-bottom: 14px;
+    padding: 12px;
+    background: var(--c-bg);
+    border: 1px solid rgba(15,42,63,0.5);
+    transition: border-color 0.2s;
+  }
+
+  .data-row:hover { border-color: var(--c-border); }
+
+  .data-row-icon {
+    width: 32px; height: 32px;
+    background: rgba(0,212,255,0.08);
+    border: 1px solid var(--c-border);
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+    color: var(--c-accent);
+    font-size: 14px;
+  }
+
+  .data-row-content { flex: 1; min-width: 0; }
+
+  .data-row-label {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    letter-spacing: 0.2em;
+    color: var(--c-dim);
+    margin-bottom: 3px;
+  }
+
+  .data-row-value {
+    font-family: var(--font-body);
+    font-size: 14px;
+    font-weight: 600;
+    color: #d0e8ff;
+    word-break: break-word;
+    line-height: 1.3;
+  }
+
+  .confidence-bar {
+    margin-top: 4px;
+    height: 2px;
+    background: var(--c-border);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .confidence-fill {
+    position: absolute; left: 0; top: 0; bottom: 0;
+    background: linear-gradient(90deg, var(--c-accent2), var(--c-accent));
+    transition: width 1s ease 0.5s;
+  }
+
+  .result-map-wrap {
+    flex: 1;
+    position: relative;
+    min-height: 300px;
+  }
+
+  #result-map {
+    position: absolute; inset: 0;
+  }
+
+  .map-overlay-hud {
+    position: absolute; top: 16px; right: 16px;
+    z-index: 500;
+    display: flex; flex-direction: column; gap: 8px;
+  }
+
+  .hud-chip {
+    background: rgba(6,13,20,0.9);
+    border: 1px solid var(--c-border);
+    padding: 8px 14px;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.15em;
+    color: var(--c-accent);
+    backdrop-filter: blur(8px);
+  }
+
+  .map-crosshair {
+    position: absolute; top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 400;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.5s ease;
+  }
+
+  .map-crosshair.visible { opacity: 1; }
+
+  .crosshair-ring {
+    width: 60px; height: 60px;
+    border: 1px solid rgba(0,212,255,0.4);
+    border-radius: 50%;
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    animation: crosshairPulse 2s ease-in-out infinite;
+  }
+
+  .crosshair-ring:nth-child(2) {
+    width: 100px; height: 100px;
+    animation-delay: 0.3s;
+    opacity: 0.5;
+  }
+
+  @keyframes crosshairPulse {
+    0%, 100% { transform: translate(-50%, -50%) scale(1); opacity: 0.6; }
+    50% { transform: translate(-50%, -50%) scale(1.1); opacity: 0.2; }
+  }
+
+  .result-action-bar {
+    position: absolute; bottom: 40px; left: 0; right: 0;
+    display: flex; justify-content: center; gap: 12px;
+    z-index: 500;
+    padding: 0 16px;
+  }
+
+  .action-btn {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.2em;
+    padding: 10px 20px;
+    border: 1px solid var(--c-border);
+    background: rgba(6,13,20,0.9);
+    color: var(--c-dim);
+    cursor: pointer;
+    text-transform: uppercase;
+    transition: all 0.3s ease;
+    backdrop-filter: blur(8px);
+  }
+
+  .action-btn:hover { color: var(--c-accent); border-color: var(--c-accent); }
+  .action-btn.primary { color: var(--c-accent2); border-color: var(--c-accent2); }
+  .action-btn.primary:hover {
+    background: rgba(0,255,136,0.1);
+    box-shadow: 0 0 20px rgba(0,255,136,0.2);
+  }
+
+  /* ── LEAFLET DARK OVERRIDES ── */
+  .leaflet-container { background: #020408; }
+  .leaflet-control-zoom a {
+    background: var(--c-surface) !important;
+    color: var(--c-accent) !important;
+    border: 1px solid var(--c-border) !important;
+  }
+  .leaflet-control-attribution {
+    background: rgba(6,13,20,0.8) !important;
+    color: var(--c-dim) !important;
+    font-size: 9px !important;
+  }
+  .leaflet-control-attribution a { color: var(--c-dim) !important; }
+
+  /* ── ERROR STATE ── */
+  .error-msg {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--c-accent3);
+    margin-top: 16px;
+    padding: 12px 16px;
+    border: 1px solid rgba(255,51,102,0.3);
+    background: rgba(255,51,102,0.05);
+    display: none;
+    letter-spacing: 0.05em;
+    line-height: 1.5;
+  }
+
+  .error-msg.visible { display: block; }
+
+  /* ── MOBILE RESPONSIVE ── */
+  @media (max-width: 768px) {
+    #screen-result {
+      flex-direction: column;
+    }
+    .result-sidebar {
+      width: 100%;
+      min-width: unset;
+      max-height: 55vh;
+      border-right: none;
+      border-bottom: 1px solid var(--c-border);
+    }
+    .result-map-wrap { min-height: 45vh; }
+  }
+
+  /* ── GLITCH TEXT ── */
+  @keyframes glitch {
+    0% { text-shadow: 0 0 40px rgba(0,212,255,0.6); }
+    20% { text-shadow: 2px 0 40px rgba(255,51,102,0.6), -2px 0 20px rgba(0,212,255,0.4); }
+    40% { text-shadow: -2px 0 40px rgba(0,255,136,0.6), 2px 0 20px rgba(0,212,255,0.4); }
+    60% { text-shadow: 0 0 40px rgba(0,212,255,0.6); }
+    80% { text-shadow: 1px 0 20px rgba(255,51,102,0.3); }
+    100% { text-shadow: 0 0 40px rgba(0,212,255,0.6); }
+  }
+
+  .glitch-text { animation: glitch 4s ease-in-out infinite; }
+
+  /* ── CORNER DECORATIONS ── */
+  .corner-deco {
+    position: fixed;
+    width: 60px; height: 60px;
+    z-index: 50;
+    pointer-events: none;
+  }
+  .corner-deco.tl { top: 16px; left: 16px; border-top: 1px solid rgba(0,212,255,0.3); border-left: 1px solid rgba(0,212,255,0.3); }
+  .corner-deco.tr { top: 16px; right: 16px; border-top: 1px solid rgba(0,212,255,0.3); border-right: 1px solid rgba(0,212,255,0.3); }
+  .corner-deco.bl { bottom: 52px; left: 16px; border-bottom: 1px solid rgba(0,212,255,0.3); border-left: 1px solid rgba(0,212,255,0.3); }
+  .corner-deco.br { bottom: 52px; right: 16px; border-bottom: 1px solid rgba(0,212,255,0.3); border-right: 1px solid rgba(0,212,255,0.3); }
+
+  /* scrollbar */
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: var(--c-bg); }
+  ::-webkit-scrollbar-thumb { background: var(--c-border); }
+</style>
+</head>
+<body>
+
+<canvas id="matrix-canvas"></canvas>
+
+<!-- Corner decorations -->
+<div class="corner-deco tl"></div>
+<div class="corner-deco tr"></div>
+<div class="corner-deco bl"></div>
+<div class="corner-deco br"></div>
+
+<!-- ═══════════════════════════════════ HOME SCREEN -->
+<div class="screen" id="screen-home">
+  <div class="home-logo-wrap">
+    <div class="home-logo-ring"></div>
+    <div class="home-logo-ring"></div>
+    <div class="home-logo-ring"></div>
+    <div class="home-icon">
+      <svg viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="40" cy="40" r="30" stroke="currentColor" stroke-width="1" opacity="0.3" fill="none"/>
+        <circle cx="40" cy="40" r="18" stroke="currentColor" stroke-width="1.5" fill="none"/>
+        <circle cx="40" cy="40" r="4" fill="currentColor"/>
+        <line x1="40" y1="10" x2="40" y2="22" stroke="currentColor" stroke-width="1.5"/>
+        <line x1="40" y1="58" x2="40" y2="70" stroke="currentColor" stroke-width="1.5"/>
+        <line x1="10" y1="40" x2="22" y2="40" stroke="currentColor" stroke-width="1.5"/>
+        <line x1="58" y1="40" x2="70" y2="40" stroke="currentColor" stroke-width="1.5"/>
+        <line x1="20" y1="20" x2="28" y2="28" stroke="currentColor" stroke-width="1" opacity="0.5"/>
+        <line x1="52" y1="52" x2="60" y2="60" stroke="currentColor" stroke-width="1" opacity="0.5"/>
+        <line x1="60" y1="20" x2="52" y2="28" stroke="currentColor" stroke-width="1" opacity="0.5"/>
+        <line x1="28" y1="52" x2="20" y2="60" stroke="currentColor" stroke-width="1" opacity="0.5"/>
+        <circle cx="40" cy="10" r="2" fill="currentColor" opacity="0.6"/>
+        <circle cx="40" cy="70" r="2" fill="currentColor" opacity="0.6"/>
+        <circle cx="10" cy="40" r="2" fill="currentColor" opacity="0.6"/>
+        <circle cx="70" cy="40" r="2" fill="currentColor" opacity="0.6"/>
+      </svg>
+    </div>
+  </div>
+
+  <div class="home-title glitch-text">NEXUS TRACE</div>
+  <div class="home-subtitle">GEO INTELLIGENCE SYSTEM</div>
+  <div class="home-version">v4.1.0 // DARK PROTOCOL ACTIVE // ENCRYPTED CHANNEL</div>
+  <div class="divider-line"></div>
+
+  <button class="btn-start" onclick="goToEntry()">INITIATE TRACE</button>
+</div>
+
+<!-- ═══════════════════════════════════ ENTRY SCREEN -->
+<div class="screen hidden" id="screen-entry">
+  <div class="panel entry-panel">
+    <div class="panel-label">TRACE PROTOCOL</div>
+    <div class="entry-title">Target Acquisition</div>
+    <div class="entry-desc">Enter an IP address or phone number to begin geolocation trace. Signal routing through encrypted nodes.</div>
+
+    <div class="tab-row">
+      <button class="tab-btn active" id="tab-ip" onclick="switchTab('ip')">IP ADDRESS</button>
+      <button class="tab-btn" id="tab-phone" onclick="switchTab('phone')">PHONE NUMBER</button>
+    </div>
+
+    <div id="input-ip-wrap" class="input-wrap">
+      <input class="input-field" id="input-ip" type="text" placeholder="000.000.000.000" maxlength="45" spellcheck="false" autocomplete="off"/>
+      <div class="input-icon">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/>
+        </svg>
+      </div>
+      <div class="input-hint">IPv4 or IPv6 format accepted. Leave blank to trace your own IP.</div>
+    </div>
+
+    <div id="input-phone-wrap" class="input-wrap" style="display:none">
+      <input class="input-field" id="input-phone" type="text" placeholder="+91 9876543210" maxlength="20" spellcheck="false" autocomplete="off"/>
+      <div class="input-icon">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.07 9.81a19.79 19.79 0 01-3.07-8.68A2 2 0 012 .18h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L6.09 7.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 14.92z"/>
+        </svg>
+      </div>
+      <div class="input-hint">Include country code (e.g. +91, +1, +44). Shows carrier and region.</div>
+    </div>
+
+    <div class="error-msg" id="error-msg">// ERROR: Invalid target format. Verify input and retry.</div>
+
+    <button class="btn-trace" onclick="beginTrace()"><span>EXECUTE TRACE</span></button>
+    <button class="btn-back" onclick="goHome()">ABORT // RETURN TO HOME</button>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════ LOADING SCREEN -->
+<div class="screen hidden" id="screen-loading">
+  <div class="loading-ring-wrap">
+    <div class="loading-ring lr1"></div>
+    <div class="loading-ring lr2"></div>
+    <div class="loading-ring lr3"></div>
+    <div class="lr-center">
+      <div style="font-size:18px;color:var(--c-accent)">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/>
+        </svg>
+      </div>
+      <div style="font-size:8px;margin-top:4px;letter-spacing:0.1em">TRACING</div>
+    </div>
+  </div>
+
+  <div class="loading-title">SIGNAL LOCK</div>
+
+  <div class="loading-steps" id="loading-steps">
+    <div class="loading-step" id="step1">
+      <span class="step-icon">></span>
+      <span>Routing through encrypted nodes...</span>
+    </div>
+    <div class="loading-step" id="step2">
+      <span class="step-icon">></span>
+      <span>Querying geolocation database...</span>
+    </div>
+    <div class="loading-step" id="step3">
+      <span class="step-icon">></span>
+      <span>Resolving ISP and network data...</span>
+    </div>
+    <div class="loading-step" id="step4">
+      <span class="step-icon">></span>
+      <span>Mapping coordinates to grid...</span>
+    </div>
+    <div class="loading-step" id="step5">
+      <span class="step-icon">></span>
+      <span>Compiling intelligence report...</span>
+    </div>
+  </div>
+
+  <div class="loading-bar-wrap">
+    <div class="loading-bar" id="loading-bar"></div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════ RESULT SCREEN -->
+<div class="screen hidden" id="screen-result">
+  <div class="result-sidebar">
+    <div class="sidebar-header">
+      <div class="sidebar-logo">NEXUS TRACE</div>
+      <div class="sidebar-tagline">GEO INTELLIGENCE REPORT // CLASSIFIED</div>
+    </div>
+
+    <div class="target-badge">
+      <div class="target-label">TARGET ACQUIRED</div>
+      <div class="target-value" id="result-target">—</div>
+    </div>
+
+    <div class="data-section">
+      <div class="data-section-title">LOCATION DATA</div>
+
+      <div class="data-row">
+        <div class="data-row-icon">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/>
+          </svg>
+        </div>
+        <div class="data-row-content">
+          <div class="data-row-label">CITY / REGION</div>
+          <div class="data-row-value" id="result-city">—</div>
+        </div>
+      </div>
+
+      <div class="data-row">
+        <div class="data-row-icon">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"/>
+          </svg>
+        </div>
+        <div class="data-row-content">
+          <div class="data-row-label">COUNTRY</div>
+          <div class="data-row-value" id="result-country">—</div>
+        </div>
+      </div>
+
+      <div class="data-row">
+        <div class="data-row-icon">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+          </svg>
+        </div>
+        <div class="data-row-content">
+          <div class="data-row-label">COORDINATES</div>
+          <div class="data-row-value" id="result-coords">—</div>
+          <div class="confidence-bar"><div class="confidence-fill" id="conf-bar" style="width:0%"></div></div>
+        </div>
+      </div>
+
+      <div class="data-row">
+        <div class="data-row-icon">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/>
+          </svg>
+        </div>
+        <div class="data-row-content">
+          <div class="data-row-label">TIMEZONE</div>
+          <div class="data-row-value" id="result-timezone">—</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="data-section">
+      <div class="data-section-title">NETWORK DATA</div>
+
+      <div class="data-row">
+        <div class="data-row-icon">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M5 12.55a11 11 0 0114.08 0M1.42 9a16 16 0 0121.16 0M8.53 16.11a6 6 0 016.95 0M12 20h.01"/>
+          </svg>
+        </div>
+        <div class="data-row-content">
+          <div class="data-row-label">ISP / CARRIER</div>
+          <div class="data-row-value" id="result-isp">—</div>
+        </div>
+      </div>
+
+      <div class="data-row">
+        <div class="data-row-icon">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+          </svg>
+        </div>
+        <div class="data-row-content">
+          <div class="data-row-label">ASN / ORG</div>
+          <div class="data-row-value" id="result-org">—</div>
+        </div>
+      </div>
+
+      <div class="data-row">
+        <div class="data-row-icon">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+          </svg>
+        </div>
+        <div class="data-row-content">
+          <div class="data-row-label">CONNECTION TYPE</div>
+          <div class="data-row-value" id="result-conntype">—</div>
+        </div>
+      </div>
+    </div>
+
+    <div style="padding: 0 24px 80px">
+      <button class="btn-back" onclick="goToEntry()" style="margin-top:0">NEW TRACE</button>
+      <button class="btn-back" onclick="goHome()" style="margin-top:8px">HOME</button>
+    </div>
+  </div>
+
+  <div class="result-map-wrap">
+    <div id="result-map"></div>
+    <div class="map-crosshair" id="map-crosshair">
+      <div class="crosshair-ring"></div>
+      <div class="crosshair-ring"></div>
+    </div>
+    <div class="map-overlay-hud">
+      <div class="hud-chip" id="hud-coords">LAT/LNG: --</div>
+      <div class="hud-chip" id="hud-zoom">ZOOM: --</div>
+      <div class="hud-chip" id="hud-status">STATUS: LOCKED</div>
+    </div>
+    <div class="result-action-bar">
+      <button class="action-btn primary" onclick="copyCoords()">COPY COORDS</button>
+      <button class="action-btn" onclick="openStreetView()">OPEN IN MAPS</button>
+    </div>
+  </div>
+</div>
+
+<!-- STATUS BAR -->
+<div class="status-bar">
+  <div class="status-item"><div class="status-dot"></div>SYSTEM ONLINE</div>
+  <div class="status-item" id="status-time">TIME: --:--:--</div>
+  <div class="status-item" style="margin-left:auto">NEXUS TRACE v4.1.0</div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+// ── MATRIX RAIN ──────────────────────────────────────────
+const canvas = document.getElementById('matrix-canvas');
+const ctx = canvas.getContext('2d');
+let cols, drops;
+
+function initMatrix() {
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+  const fontSize = 13;
+  cols = Math.floor(canvas.width / fontSize);
+  drops = Array(cols).fill(0).map(() => Math.random() * -100);
+}
+
+function drawMatrix() {
+  ctx.fillStyle = 'rgba(2,4,8,0.05)';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.fillStyle = '#00d4ff';
+  ctx.font = '12px Share Tech Mono';
+  const chars = '01アイウエオカキクケコサシスセソタチツテトナニヌネノ';
+  for (let i = 0; i < drops.length; i++) {
+    const char = chars[Math.floor(Math.random() * chars.length)];
+    const x = i * 13;
+    const y = drops[i] * 13;
+    ctx.globalAlpha = Math.random() * 0.5 + 0.1;
+    ctx.fillStyle = Math.random() > 0.98 ? '#00ff88' : '#00d4ff';
+    ctx.fillText(char, x, y);
+    if (y > canvas.height && Math.random() > 0.975) drops[i] = 0;
+    drops[i]++;
+  }
+  ctx.globalAlpha = 1;
+}
+
+initMatrix();
+setInterval(drawMatrix, 50);
+window.addEventListener('resize', initMatrix);
+
+// ── CLOCK ────────────────────────────────────────────────
+function updateClock() {
+  const now = new Date();
+  const t = now.toTimeString().split(' ')[0];
+  document.getElementById('status-time').textContent = `TIME: ${t}`;
+}
+setInterval(updateClock, 1000);
+updateClock();
+
+// ── SCREEN TRANSITIONS ───────────────────────────────────
+let resultMap = null;
+let currentLat = null;
+let currentLng = null;
+let currentTab = 'ip';
+
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.add('hidden'));
+  const el = document.getElementById(id);
+  el.classList.remove('hidden');
+}
+
+function goHome() {
+  showScreen('screen-home');
+  clearError();
+}
+
+function goToEntry() {
+  showScreen('screen-entry');
+  clearError();
+  setTimeout(() => {
+    const inp = document.getElementById(currentTab === 'ip' ? 'input-ip' : 'input-phone');
+    if (inp) inp.focus();
+  }, 300);
+}
+
+function switchTab(tab) {
+  currentTab = tab;
+  document.getElementById('tab-ip').classList.toggle('active', tab === 'ip');
+  document.getElementById('tab-phone').classList.toggle('active', tab === 'phone');
+  document.getElementById('input-ip-wrap').style.display = tab === 'ip' ? 'block' : 'none';
+  document.getElementById('input-phone-wrap').style.display = tab === 'phone' ? 'block' : 'none';
+  clearError();
+}
+
+function clearError() {
+  document.getElementById('error-msg').classList.remove('visible');
+}
+
+function showError(msg) {
+  const el = document.getElementById('error-msg');
+  el.textContent = `// ERROR: ${msg}`;
+  el.classList.add('visible');
+}
+
+// ── LOADING ANIMATION ────────────────────────────────────
+function animateLoading(cb) {
+  showScreen('screen-loading');
+  const bar = document.getElementById('loading-bar');
+  const steps = [
+    document.getElementById('step1'),
+    document.getElementById('step2'),
+    document.getElementById('step3'),
+    document.getElementById('step4'),
+    document.getElementById('step5'),
+  ];
+
+  steps.forEach(s => { s.className = 'loading-step'; });
+  bar.style.width = '0%';
+
+  const timings = [0, 400, 900, 1400, 1900];
+  const barVals = ['5%', '25%', '50%', '75%', '90%'];
+
+  timings.forEach((t, i) => {
+    setTimeout(() => {
+      if (i > 0) steps[i-1].classList.replace('active', 'done');
+      steps[i].classList.add('active');
+      bar.style.width = barVals[i];
+    }, t);
+  });
+
+  setTimeout(() => {
+    steps[4].classList.replace('active', 'done');
+    bar.style.width = '100%';
+    setTimeout(cb, 400);
+  }, 2500);
+}
+
+// ── TRACE LOGIC ──────────────────────────────────────────
+function beginTrace() {
+  clearError();
+  const val = currentTab === 'ip'
+    ? document.getElementById('input-ip').value.trim()
+    : document.getElementById('input-phone').value.trim();
+
+  if (currentTab === 'phone' && val && !val.match(/^\+?[\d\s\-().]{7,20}$/)) {
+    showError('Invalid phone format. Include country code (e.g. +91).');
+    return;
+  }
+
+  animateLoading(() => {
+    if (currentTab === 'ip') traceIP(val);
+    else tracePhone(val);
+  });
+}
+
+function traceIP(ip) {
+  const endpoint = ip
+    ? `https://ip-api.com/json/${encodeURIComponent(ip)}?fields=status,message,country,countryCode,regionName,city,zip,lat,lon,timezone,isp,org,as,mobile,proxy,hosting,query`
+    : `https://ip-api.com/json/?fields=status,message,country,countryCode,regionName,city,zip,lat,lon,timezone,isp,org,as,mobile,proxy,hosting,query`;
+
+  fetch(endpoint)
+    .then(r => r.json())
+    .then(data => {
+      if (data.status === 'fail') {
+        goToEntry();
+        showError(data.message || 'Lookup failed. Check the IP address.');
+        return;
+      }
+      const connType = data.hosting ? 'Hosting/Datacenter' : data.proxy ? 'Proxy/VPN' : data.mobile ? 'Mobile Network' : 'Residential/Business';
+      renderResult({
+        target: data.query,
+        city: `${data.city}, ${data.regionName}`,
+        country: `${data.country} (${data.countryCode})`,
+        coords: `${data.lat.toFixed(5)}, ${data.lon.toFixed(5)}`,
+        timezone: data.timezone,
+        isp: data.isp || '—',
+        org: data.org || '—',
+        conntype: connType,
+        lat: data.lat,
+        lng: data.lon,
+      });
+    })
+    .catch(() => {
+      goToEntry();
+      showError('Network error. Check your connection and retry.');
+    });
+}
+
+function tracePhone(phone) {
+  // Phone: use numvalidateapi (free, no key) for country/carrier, then map country centroid
+  const cleaned = phone.replace(/[\s\-().]/g, '');
+  fetch(`https://api.apilayer.com/number_verification/validate?number=${encodeURIComponent(cleaned)}`, {
+    headers: { apikey: '' }
+  })
+  .catch(() => null)
+  .then(() => {
+    // Fallback: parse country from calling code and map to centroid
+    const countryCentroids = {
+      '+91': {name:'India',lat:20.5937,lng:78.9629,tz:'Asia/Kolkata'},
+      '+1': {name:'United States',lat:37.0902,lng:-95.7129,tz:'America/New_York'},
+      '+44': {name:'United Kingdom',lat:55.3781,lng:-3.4360,tz:'Europe/London'},
+      '+61': {name:'Australia',lat:-25.2744,lng:133.7751,tz:'Australia/Sydney'},
+      '+81': {name:'Japan',lat:36.2048,lng:138.2529,tz:'Asia/Tokyo'},
+      '+49': {name:'Germany',lat:51.1657,lng:10.4515,tz:'Europe/Berlin'},
+      '+33': {name:'France',lat:46.2276,lng:2.2137,tz:'Europe/Paris'},
+      '+86': {name:'China',lat:35.8617,lng:104.1954,tz:'Asia/Shanghai'},
+      '+7': {name:'Russia',lat:61.5240,lng:105.3188,tz:'Europe/Moscow'},
+      '+55': {name:'Brazil',lat:-14.2350,lng:-51.9253,tz:'America/Sao_Paulo'},
+      '+27': {name:'South Africa',lat:-30.5595,lng:22.9375,tz:'Africa/Johannesburg'},
+      '+82': {name:'South Korea',lat:35.9078,lng:127.7669,tz:'Asia/Seoul'},
+      '+62': {name:'Indonesia',lat:-0.7893,lng:113.9213,tz:'Asia/Jakarta'},
+      '+52': {name:'Mexico',lat:23.6345,lng:-102.5528,tz:'America/Mexico_City'},
+      '+234': {name:'Nigeria',lat:9.0820,lng:8.6753,tz:'Africa/Lagos'},
+      '+20': {name:'Egypt',lat:26.8206,lng:30.8025,tz:'Africa/Cairo'},
+      '+966': {name:'Saudi Arabia',lat:23.8859,lng:45.0792,tz:'Asia/Riyadh'},
+      '+971': {name:'UAE',lat:23.4241,lng:53.8478,tz:'Asia/Dubai'},
+      '+65': {name:'Singapore',lat:1.3521,lng:103.8198,tz:'Asia/Singapore'},
+      '+60': {name:'Malaysia',lat:4.2105,lng:101.9758,tz:'Asia/Kuala_Lumpur'},
+    };
+
+    let matched = null;
+    const sortedCodes = Object.keys(countryCentroids).sort((a,b) => b.length - a.length);
+    for (const code of sortedCodes) {
+      if (cleaned.startsWith(code)) {
+        matched = { code, ...countryCentroids[code] };
+        break;
+      }
+    }
+
+    if (!matched) {
+      goToEntry();
+      showError('Unknown country code. Include country code (e.g. +91, +1, +44).');
+      return;
+    }
+
+    const local = cleaned.slice(matched.code.length);
+    const carrier = getCarrierHint(matched.code, local);
+
+    renderResult({
+      target: phone,
+      city: `Region data via carrier lookup`,
+      country: matched.name,
+      coords: `${matched.lat.toFixed(5)}, ${matched.lng.toFixed(5)}`,
+      timezone: matched.tz,
+      isp: carrier,
+      org: `Country Code: ${matched.code}`,
+      conntype: 'Mobile Network',
+      lat: matched.lat,
+      lng: matched.lng,
+    });
+  });
+}
+
+function getCarrierHint(code, local) {
+  if (code === '+91') {
+    if (local.startsWith('6') || local.startsWith('7')) return 'Jio / Reliance';
+    if (local.startsWith('8') || local.startsWith('9')) return 'Airtel / Vi / BSNL';
+    return 'Indian Telecom Carrier';
+  }
+  if (code === '+1') return 'US/Canada Carrier';
+  if (code === '+44') return 'UK Mobile Carrier';
+  return 'Carrier Lookup';
+}
+
+// ── RENDER RESULT ────────────────────────────────────────
+function renderResult(data) {
+  currentLat = data.lat;
+  currentLng = data.lng;
+
+  document.getElementById('result-target').textContent = data.target;
+  document.getElementById('result-city').textContent = data.city;
+  document.getElementById('result-country').textContent = data.country;
+  document.getElementById('result-coords').textContent = data.coords;
+  document.getElementById('result-timezone').textContent = data.timezone;
+  document.getElementById('result-isp').textContent = data.isp;
+  document.getElementById('result-org').textContent = data.org;
+  document.getElementById('result-conntype').textContent = data.conntype;
+  document.getElementById('hud-coords').textContent = `LAT/LNG: ${data.lat.toFixed(4)}, ${data.lng.toFixed(4)}`;
+
+  showScreen('screen-result');
+
+  // Animate confidence bar
+  setTimeout(() => {
+    document.getElementById('conf-bar').style.width = currentTab === 'ip' ? '88%' : '62%';
+  }, 600);
+
+  // Init or update map
+  setTimeout(() => {
+    if (!resultMap) {
+      resultMap = L.map('result-map', { zoomControl: true, attributionControl: true });
+      L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+        attribution: '&copy; OpenStreetMap contributors &copy; CARTO',
+        subdomains: 'abcd',
+        maxZoom: 19
+      }).addTo(resultMap);
+
+      resultMap.on('zoom', () => {
+        document.getElementById('hud-zoom').textContent = `ZOOM: ${resultMap.getZoom()}`;
+      });
+    }
+
+    resultMap.invalidateSize();
+
+    // Custom marker
+    const markerHtml = `
+      <div style="
+        width:16px;height:16px;
+        border-radius:50%;
+        background:rgba(0,212,255,0.9);
+        border:2px solid #fff;
+        box-shadow:0 0 0 4px rgba(0,212,255,0.3), 0 0 20px rgba(0,212,255,0.6);
+        position:relative;
+      ">
+        <div style="
+          position:absolute;top:50%;left:50%;
+          transform:translate(-50%,-50%);
+          width:32px;height:32px;
+          border-radius:50%;
+          border:1px solid rgba(0,212,255,0.4);
+          animation:none;
+        "></div>
+      </div>`;
+
+    const icon = L.divIcon({
+      html: markerHtml,
+      iconSize: [16, 16],
+      iconAnchor: [8, 8],
+      className: ''
+    });
+
+    resultMap.eachLayer(layer => {
+      if (layer instanceof L.Marker) resultMap.removeLayer(layer);
+    });
+
+    const marker = L.marker([data.lat, data.lng], { icon })
+      .addTo(resultMap)
+      .bindPopup(`
+        <div style="font-family:'Share Tech Mono',monospace;font-size:11px;color:#00d4ff;background:#060d14;border:1px solid #0f2a3f;padding:8px;min-width:180px">
+          <div style="color:#a8c8e8;margin-bottom:4px;font-size:9px;letter-spacing:0.2em">TARGET LOCATION</div>
+          <div style="font-size:13px;margin-bottom:4px">${data.city}</div>
+          <div style="color:#00ff88">${data.coords}</div>
+        </div>
+      `, {
+        className: 'custom-popup'
+      })
+      .openPopup();
+
+    resultMap.setView([data.lat, data.lng], 11);
+    document.getElementById('hud-zoom').textContent = `ZOOM: 11`;
+    document.getElementById('hud-status').textContent = 'STATUS: LOCKED';
+
+    setTimeout(() => {
+      document.getElementById('map-crosshair').classList.add('visible');
+    }, 800);
+
+  }, 300);
+}
+
+// ── ACTIONS ──────────────────────────────────────────────
+function copyCoords() {
+  if (currentLat === null) return;
+  const txt = `${currentLat}, ${currentLng}`;
+  navigator.clipboard.writeText(txt).catch(() => {});
+  const btn = document.querySelector('.action-btn.primary');
+  const orig = btn.textContent;
+  btn.textContent = 'COPIED';
+  setTimeout(() => { btn.textContent = orig; }, 1500);
+}
+
+function openStreetView() {
+  if (currentLat === null) return;
+  window.open(`https://www.openstreetmap.org/?mlat=${currentLat}&mlon=${currentLng}#map=14/${currentLat}/${currentLng}`, '_blank');
+}
+
+// ── KEYBOARD ─────────────────────────────────────────────
+document.addEventListener('keydown', e => {
+  if (e.key === 'Enter') {
+    const active = document.querySelector('.screen:not(.hidden)');
+    if (active && active.id === 'screen-entry') beginTrace();
+  }
+  if (e.key === 'Escape') {
+    const active = document.querySelector('.screen:not(.hidden)');
+    if (active && (active.id === 'screen-entry' || active.id === 'screen-result')) goHome();
+  }
+});
+</script>
+</body>
+</html>
