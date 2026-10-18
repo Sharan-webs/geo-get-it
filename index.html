@@ -1292,79 +1292,161 @@ function traceIP(ip) {
 }
 
 function tracePhone(phone) {
-  // Phone: use numvalidateapi (free, no key) for country/carrier, then map country centroid
   const cleaned = phone.replace(/[\s\-().]/g, '');
-  fetch(`https://api.apilayer.com/number_verification/validate?number=${encodeURIComponent(cleaned)}`, {
-    headers: { apikey: '' }
-  })
-  .catch(() => null)
-  .then(() => {
-    // Fallback: parse country from calling code and map to centroid
-    const countryCentroids = {
-      '+91': {name:'India',lat:20.5937,lng:78.9629,tz:'Asia/Kolkata'},
-      '+1': {name:'United States',lat:37.0902,lng:-95.7129,tz:'America/New_York'},
-      '+44': {name:'United Kingdom',lat:55.3781,lng:-3.4360,tz:'Europe/London'},
-      '+61': {name:'Australia',lat:-25.2744,lng:133.7751,tz:'Australia/Sydney'},
-      '+81': {name:'Japan',lat:36.2048,lng:138.2529,tz:'Asia/Tokyo'},
-      '+49': {name:'Germany',lat:51.1657,lng:10.4515,tz:'Europe/Berlin'},
-      '+33': {name:'France',lat:46.2276,lng:2.2137,tz:'Europe/Paris'},
-      '+86': {name:'China',lat:35.8617,lng:104.1954,tz:'Asia/Shanghai'},
-      '+7': {name:'Russia',lat:61.5240,lng:105.3188,tz:'Europe/Moscow'},
-      '+55': {name:'Brazil',lat:-14.2350,lng:-51.9253,tz:'America/Sao_Paulo'},
-      '+27': {name:'South Africa',lat:-30.5595,lng:22.9375,tz:'Africa/Johannesburg'},
-      '+82': {name:'South Korea',lat:35.9078,lng:127.7669,tz:'Asia/Seoul'},
-      '+62': {name:'Indonesia',lat:-0.7893,lng:113.9213,tz:'Asia/Jakarta'},
-      '+52': {name:'Mexico',lat:23.6345,lng:-102.5528,tz:'America/Mexico_City'},
-      '+234': {name:'Nigeria',lat:9.0820,lng:8.6753,tz:'Africa/Lagos'},
-      '+20': {name:'Egypt',lat:26.8206,lng:30.8025,tz:'Africa/Cairo'},
-      '+966': {name:'Saudi Arabia',lat:23.8859,lng:45.0792,tz:'Asia/Riyadh'},
-      '+971': {name:'UAE',lat:23.4241,lng:53.8478,tz:'Asia/Dubai'},
-      '+65': {name:'Singapore',lat:1.3521,lng:103.8198,tz:'Asia/Singapore'},
-      '+60': {name:'Malaysia',lat:4.2105,lng:101.9758,tz:'Asia/Kuala_Lumpur'},
-    };
 
-    let matched = null;
-    const sortedCodes = Object.keys(countryCentroids).sort((a,b) => b.length - a.length);
-    for (const code of sortedCodes) {
-      if (cleaned.startsWith(code)) {
-        matched = { code, ...countryCentroids[code] };
-        break;
-      }
+  const countryCentroids = {
+    '+91':  {name:'India',          lat:20.5937,  lng:78.9629,   tz:'Asia/Kolkata'},
+    '+1':   {name:'United States',  lat:37.0902,  lng:-95.7129,  tz:'America/New_York'},
+    '+44':  {name:'United Kingdom', lat:55.3781,  lng:-3.4360,   tz:'Europe/London'},
+    '+61':  {name:'Australia',      lat:-25.2744, lng:133.7751,  tz:'Australia/Sydney'},
+    '+81':  {name:'Japan',          lat:36.2048,  lng:138.2529,  tz:'Asia/Tokyo'},
+    '+49':  {name:'Germany',        lat:51.1657,  lng:10.4515,   tz:'Europe/Berlin'},
+    '+33':  {name:'France',         lat:46.2276,  lng:2.2137,    tz:'Europe/Paris'},
+    '+86':  {name:'China',          lat:35.8617,  lng:104.1954,  tz:'Asia/Shanghai'},
+    '+7':   {name:'Russia',         lat:61.5240,  lng:105.3188,  tz:'Europe/Moscow'},
+    '+55':  {name:'Brazil',         lat:-14.2350, lng:-51.9253,  tz:'America/Sao_Paulo'},
+    '+27':  {name:'South Africa',   lat:-30.5595, lng:22.9375,   tz:'Africa/Johannesburg'},
+    '+82':  {name:'South Korea',    lat:35.9078,  lng:127.7669,  tz:'Asia/Seoul'},
+    '+62':  {name:'Indonesia',      lat:-0.7893,  lng:113.9213,  tz:'Asia/Jakarta'},
+    '+52':  {name:'Mexico',         lat:23.6345,  lng:-102.5528, tz:'America/Mexico_City'},
+    '+234': {name:'Nigeria',        lat:9.0820,   lng:8.6753,    tz:'Africa/Lagos'},
+    '+20':  {name:'Egypt',          lat:26.8206,  lng:30.8025,   tz:'Africa/Cairo'},
+    '+966': {name:'Saudi Arabia',   lat:23.8859,  lng:45.0792,   tz:'Asia/Riyadh'},
+    '+971': {name:'UAE',            lat:23.4241,  lng:53.8478,   tz:'Asia/Dubai'},
+    '+65':  {name:'Singapore',      lat:1.3521,   lng:103.8198,  tz:'Asia/Singapore'},
+    '+60':  {name:'Malaysia',       lat:4.2105,   lng:101.9758,  tz:'Asia/Kuala_Lumpur'},
+    '+92':  {name:'Pakistan',       lat:30.3753,  lng:69.3451,   tz:'Asia/Karachi'},
+    '+880': {name:'Bangladesh',     lat:23.6850,  lng:90.3563,   tz:'Asia/Dhaka'},
+    '+94':  {name:'Sri Lanka',      lat:7.8731,   lng:80.7718,   tz:'Asia/Colombo'},
+    '+977': {name:'Nepal',          lat:28.3949,  lng:84.1240,   tz:'Asia/Kathmandu'},
+  };
+
+  // India telecom circle map -- prefix 4 digits → state/region + coords
+  const indiaCircles = {
+    '6374': {region:'Tamil Nadu',      lat:13.0827, lng:80.2707},
+    '6375': {region:'Tamil Nadu',      lat:13.0827, lng:80.2707},
+    '6376': {region:'Tamil Nadu',      lat:13.0827, lng:80.2707},
+    '6379': {region:'Tamil Nadu',      lat:13.0827, lng:80.2707},
+    '6380': {region:'Tamil Nadu',      lat:13.0827, lng:80.2707},
+    '7200': {region:'Tamil Nadu',      lat:13.0827, lng:80.2707},
+    '7305': {region:'Tamil Nadu',      lat:13.0827, lng:80.2707},
+    '9840': {region:'Tamil Nadu',      lat:13.0827, lng:80.2707},
+    '9841': {region:'Tamil Nadu',      lat:13.0827, lng:80.2707},
+    '9842': {region:'Tamil Nadu',      lat:13.0827, lng:80.2707},
+    '9843': {region:'Tamil Nadu',      lat:13.0827, lng:80.2707},
+    '9884': {region:'Tamil Nadu',      lat:13.0827, lng:80.2707},
+    '9994': {region:'Tamil Nadu',      lat:13.0827, lng:80.2707},
+    '8220': {region:'Tamil Nadu',      lat:13.0827, lng:80.2707},
+    '7010': {region:'Tamil Nadu',      lat:13.0827, lng:80.2707},
+    '9810': {region:'Delhi / NCR',     lat:28.6139, lng:77.2090},
+    '9811': {region:'Delhi / NCR',     lat:28.6139, lng:77.2090},
+    '9818': {region:'Delhi / NCR',     lat:28.6139, lng:77.2090},
+    '9999': {region:'Delhi / NCR',     lat:28.6139, lng:77.2090},
+    '9820': {region:'Maharashtra',     lat:19.0760, lng:72.8777},
+    '9821': {region:'Maharashtra',     lat:19.0760, lng:72.8777},
+    '9920': {region:'Maharashtra',     lat:19.0760, lng:72.8777},
+    '9830': {region:'West Bengal',     lat:22.5726, lng:88.3639},
+    '9831': {region:'West Bengal',     lat:22.5726, lng:88.3639},
+    '9980': {region:'Karnataka',       lat:12.9716, lng:77.5946},
+    '9986': {region:'Karnataka',       lat:12.9716, lng:77.5946},
+    '9900': {region:'Karnataka',       lat:12.9716, lng:77.5946},
+    '9701': {region:'Andhra Pradesh',  lat:17.3850, lng:78.4867},
+    '9703': {region:'Andhra Pradesh',  lat:17.3850, lng:78.4867},
+    '9848': {region:'Andhra Pradesh',  lat:17.3850, lng:78.4867},
+    '9850': {region:'Maharashtra',     lat:19.0760, lng:72.8777},
+    '9860': {region:'Maharashtra',     lat:19.0760, lng:72.8777},
+    '9870': {region:'Maharashtra',     lat:19.0760, lng:72.8777},
+    '9650': {region:'Haryana',         lat:29.0588, lng:76.0856},
+    '9871': {region:'Delhi / NCR',     lat:28.6139, lng:77.2090},
+    '9876': {region:'Punjab',          lat:30.7333, lng:76.7794},
+    '9878': {region:'Punjab',          lat:30.7333, lng:76.7794},
+    '9413': {region:'Rajasthan',       lat:26.9124, lng:75.7873},
+    '9414': {region:'Rajasthan',       lat:26.9124, lng:75.7873},
+    '9415': {region:'Uttar Pradesh',   lat:26.8467, lng:80.9462},
+    '9452': {region:'Uttar Pradesh',   lat:26.8467, lng:80.9462},
+    '9455': {region:'Uttar Pradesh',   lat:26.8467, lng:80.9462},
+    '9425': {region:'Madhya Pradesh',  lat:23.2599, lng:77.4126},
+    '9426': {region:'Gujarat',         lat:23.0225, lng:72.5714},
+    '9427': {region:'Gujarat',         lat:23.0225, lng:72.5714},
+    '9446': {region:'Kerala',          lat:9.9312,  lng:76.2673},
+    '9447': {region:'Kerala',          lat:9.9312,  lng:76.2673},
+    '9496': {region:'Kerala',          lat:9.9312,  lng:76.2673},
+    '9431': {region:'Bihar / Jharkhand', lat:25.0961, lng:85.3131},
+    '9934': {region:'Bihar / Jharkhand', lat:25.0961, lng:85.3131},
+    '9437': {region:'Odisha',          lat:20.2961, lng:85.8245},
+    '9438': {region:'Odisha',          lat:20.2961, lng:85.8245},
+    '9435': {region:'Assam / NE',      lat:26.1445, lng:91.7362},
+    '9436': {region:'Assam / NE',      lat:26.1445, lng:91.7362},
+    '9419': {region:'Jammu & Kashmir', lat:34.0837, lng:74.7973},
+    '9797': {region:'Jammu & Kashmir', lat:34.0837, lng:74.7973},
+  };
+
+  let matched = null;
+  const sortedCodes = Object.keys(countryCentroids).sort((a,b) => b.length - a.length);
+  for (const code of sortedCodes) {
+    if (cleaned.startsWith(code)) {
+      matched = { code, ...countryCentroids[code] };
+      break;
     }
+  }
 
-    if (!matched) {
-      goToEntry();
-      showError('Unknown country code. Include country code (e.g. +91, +1, +44).');
-      return;
+  if (!matched) {
+    goToEntry();
+    showError('Unknown country code. Include country code (e.g. +91, +1, +44).');
+    return;
+  }
+
+  const local = cleaned.slice(matched.code.length);
+  let region = matched.name;
+  let lat = matched.lat;
+  let lng = matched.lng;
+
+  // India: try to resolve circle from first 4 digits of local number
+  if (matched.code === '+91' && local.length >= 4) {
+    const prefix4 = local.slice(0, 4);
+    const prefix3 = local.slice(0, 3);
+    const circle = indiaCircles[prefix4] || indiaCircles[prefix3] || null;
+    if (circle) {
+      region = `${circle.region}, India`;
+      lat = circle.lat;
+      lng = circle.lng;
+    } else {
+      region = 'India (State data unavailable for this prefix)';
     }
+  }
 
-    const local = cleaned.slice(matched.code.length);
-    const carrier = getCarrierHint(matched.code, local);
+  const carrier = getCarrierHint(matched.code, local);
 
-    renderResult({
-      target: phone,
-      city: `Region data via carrier lookup`,
-      country: matched.name,
-      coords: `${matched.lat.toFixed(5)}, ${matched.lng.toFixed(5)}`,
-      timezone: matched.tz,
-      isp: carrier,
-      org: `Country Code: ${matched.code}`,
-      conntype: 'Mobile Network',
-      lat: matched.lat,
-      lng: matched.lng,
-    });
+  renderResult({
+    target: phone,
+    city: region,
+    country: matched.name,
+    coords: `${lat.toFixed(5)}, ${lng.toFixed(5)}`,
+    timezone: matched.tz,
+    isp: carrier,
+    org: `Dialing Code: ${matched.code}`,
+    conntype: 'Mobile Network',
+    lat: lat,
+    lng: lng,
   });
 }
 
 function getCarrierHint(code, local) {
   if (code === '+91') {
-    if (local.startsWith('6') || local.startsWith('7')) return 'Jio / Reliance';
-    if (local.startsWith('8') || local.startsWith('9')) return 'Airtel / Vi / BSNL';
+    const d = local[0];
+    if (['6'].includes(d)) return 'Jio / Reliance Industries';
+    if (d === '7') return 'Jio / BSNL / Vi';
+    if (d === '8') return 'Airtel / Vi / BSNL';
+    if (d === '9') return 'Airtel / Jio / Vi / BSNL';
     return 'Indian Telecom Carrier';
   }
-  if (code === '+1') return 'US/Canada Carrier';
-  if (code === '+44') return 'UK Mobile Carrier';
-  return 'Carrier Lookup';
+  if (code === '+1')   return 'US / Canada Carrier (AT&T / Verizon / T-Mobile)';
+  if (code === '+44')  return 'UK Carrier (EE / O2 / Vodafone / Three)';
+  if (code === '+61')  return 'Australian Carrier (Telstra / Optus / Vodafone)';
+  if (code === '+86')  return 'China Carrier (China Mobile / Unicom / Telecom)';
+  if (code === '+92')  return 'Pakistan Carrier (Jazz / Zong / Telenor / Ufone)';
+  if (code === '+880') return 'Bangladesh Carrier (Grameenphone / Robi / Banglalink)';
+  return 'Mobile Network Carrier';
 }
 
 // ── RENDER RESULT ────────────────────────────────────────
@@ -1393,9 +1475,8 @@ function renderResult(data) {
   setTimeout(() => {
     if (!resultMap) {
       resultMap = L.map('result-map', { zoomControl: true, attributionControl: true });
-      L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-        attribution: '&copy; OpenStreetMap contributors &copy; CARTO',
-        subdomains: 'abcd',
+      L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
         maxZoom: 19
       }).addTo(resultMap);
 
